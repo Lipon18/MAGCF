@@ -20,26 +20,25 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
-#include "MAGCFBakery.generated.h"
+#include "MAGCFProfiles.generated.h"
 
-class UStaticMeshComponent;
-
-UCLASS()
-class MAGCF_API AMAGCFBakery : public AActor
+USTRUCT(BlueprintType)
+struct FNPCNeedState
 {
-    GENERATED_BODY()
+    GENERATED_USTRUCT_BODY()
 
-public:
-    AMAGCFBakery();
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Need")
+    FName NeedName = TEXT("GenericNeed");
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MAGCF|Economy")
-    float BreadPrice = 5.0f;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Need")
+    float CurrentValue = 0.0f;
 
-protected:
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MAGCF|Components")
-    TObjectPtr<USceneComponent> SceneRootComponent;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Need")
+    float MaxValue = 100.0f;
 
-    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MAGCF|Components")
-    TObjectPtr<UStaticMeshComponent> BakeryMeshComponent;
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Need")
+    float DrainRate = 2.0f;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Need")
+    float CriticalThreshold = 80.0f;
 };

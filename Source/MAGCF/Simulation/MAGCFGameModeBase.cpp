@@ -17,16 +17,18 @@
 //
 // ===============================================================================*/
 
-#include "MAGCFBakery.h"
-#include "Components/StaticMeshComponent.h"
+#include "MAGCFGameModeBase.h"
+#include "MAGCF/Characters/MAGCFCharacter.h"
+#include "MAGCF/MAGCF.h"
 
-AMAGCFBakery::AMAGCFBakery() 
+AMAGCFGameModeBase::AMAGCFGameModeBase() 
 {
-    PrimaryActorTick.bCanEverTick = false;
+    DefaultPawnClass = AMAGCFCharacter::StaticClass();
+}
 
-    SceneRootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRootComponent"));
-    RootComponent = SceneRootComponent;
+void AMAGCFGameModeBase::BeginPlay()
+{
+    Super::BeginPlay();
 
-    BakeryMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BakeryMeshComponent"));
-    BakeryMeshComponent->SetupAttachment(RootComponent);
+    MAGCF_LOG(TEXT("MAGCF framework initialized."));
 }

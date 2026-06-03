@@ -17,16 +17,4 @@
 //
 // ===============================================================================*/
 
-#include "MAGCFBakery.h"
-#include "Components/StaticMeshComponent.h"
-
-AMAGCFBakery::AMAGCFBakery() 
-{
-    PrimaryActorTick.bCanEverTick = false;
-
-    SceneRootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRootComponent"));
-    RootComponent = SceneRootComponent;
-
-    BakeryMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("BakeryMeshComponent"));
-    BakeryMeshComponent->SetupAttachment(RootComponent);
-}
+#include "Characters/MAGCFJohn.h"

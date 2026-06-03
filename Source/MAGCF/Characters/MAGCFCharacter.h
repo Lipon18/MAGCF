@@ -22,9 +22,11 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "MAGCF/Enums/EGoals.h"
+#include "MAGCF/AI/Profiles/MAGCFPersonalityDataAsset.h"
 #include "MAGCFCharacter.generated.h"
 
 class AMAGCFBakery;
+class UMAGCFNeedComponent;
 
 UCLASS()
 class MAGCF_API AMAGCFCharacter : public ACharacter
@@ -38,28 +40,30 @@ public:
     virtual void Tick(float DeltaTime) override;
 
 protected:
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MAGCF|AI|Configuration")
+    UMAGCFPersonalityDataAsset* PersonalityConfig = nullptr;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AI|Components")
+    UMAGCFNeedComponent* NeedComponent = nullptr;
+
     UPROPERTY()
     EMAGCFGoal CurrentGoal = EMAGCFGoal::E_NONE;
 
-    UPROPERTY(EditAnywhere, Category = "World")
+    UPROPERTY(EditAnywhere, Category = "MAGCF|World")
     AMAGCFBakery* TargetBakery = nullptr;
 
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Needs")
-    float Hunger = 0.0f;
-
-    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Needs")
-    float MaxHunger = 100.0f;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Economy")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MAGCF|Economy")
     float Money = 20.0f;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MAGCF|AI")
     bool bHasBread = false;
 
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "AI")
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MAGCF|AI")
     bool bIsAtBakery = false;
 
     void EvaluateNeed();
     void ExecuteGoal();
     void HandleEatGoal();
+
+    FString CompileLLMContextPayload() const;
 };
