@@ -20,7 +20,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Characters/MAGCFCharacter.h"
+#include "MAGCF/Characters/MAGCFCharacter.h"
 #include "MAGCFJohn.generated.h"
 
 /**

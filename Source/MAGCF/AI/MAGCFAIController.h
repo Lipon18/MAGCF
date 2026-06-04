@@ -3,7 +3,7 @@
 //
 // MAGCF - Multi-Agent Generative Character Framework
 //
-// Copyright (c) 2026 Your Lipon / Psycho Games.
+// Copyright (c) 2026 Lipon / Psycho Games.
 //
 // All Rights Reserved.
 //

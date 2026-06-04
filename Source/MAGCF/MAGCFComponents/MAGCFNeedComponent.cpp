@@ -30,7 +30,7 @@ void UMAGCFNeedComponent::BeginPlay()
 
     FNPCNeedState HungerNeed;
     HungerNeed.NeedName = TEXT("Hunger");
-    HungerNeed.CurrentValue = 20.0f;
+    HungerNeed.CurrentValue = 85.0f;
     HungerNeed.MaxValue = 100.0f;
     HungerNeed.DrainRate = 2.0f;
     HungerNeed.CriticalThreshold = 80.0f;

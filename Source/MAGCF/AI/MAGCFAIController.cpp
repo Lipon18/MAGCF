@@ -18,3 +18,41 @@
 // ===============================================================================*/
 
 #include "MAGCF/AI/MAGCFAIController.h"
+#include "Perception/AIPerceptionComponent.h"
+#include "Perception/AISenseConfig_Sight.h"
+
+AMAGCFAIController::AMAGCFAIController() 
+{
+    PerceptionComp = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComp"));
+    SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
+
+    if (PerceptionComp && SightConfig)
+    {
+        SightConfig->SightRadius = 3000.0f;
+        SightConfig->LoseSightRadius = 3500.0f;
+        SightConfig->PeripheralVisionAngleDegrees = 90.0f;
+        SightConfig->DetectionByAffiliation.bDetectEnemies = true;
+        SightConfig->DetectionByAffiliation.bDetectFriendlies = true;
+        SightConfig->DetectionByAffiliation.bDetectNeutrals = true;
+
+        PerceptionComp->ConfigureSense(*SightConfig);
+        PerceptionComp->SetDominantSense(SightConfig->GetSenseImplementation());
+        PerceptionComp->OnPerceptionUpdated.AddDynamic(this, &AMAGCFAIController::OnPerceptionUpdated);
+    }
+}
+
+void AMAGCFAIController::BeginPlay() 
+{
+    Super::BeginPlay();
+}
+
+void AMAGCFAIController::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors) 
+{
+    for (auto* Actor : UpdatedActors)
+    {
+        if (Actor)
+        {
+            // cache the bakery when it is seen
+        }
+    }
+}

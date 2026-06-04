@@ -21,6 +21,8 @@
 #include "MAGCF/MAGCF.h"
 #include "MAGCF/World/Buildings/MAGCFBakery.h"
 #include "MAGCF/MAGCFComponents/MAGCFNeedComponent.h"
+#include "AIController.h"
+#include "Navigation/PathFollowingComponent.h"
 
 AMAGCFCharacter::AMAGCFCharacter()
 {
@@ -82,8 +84,29 @@ void AMAGCFCharacter::HandleEatGoal()
 {
     if (!bIsAtBakery)
     {
-        MAGCF_AI(TEXT("Going to bakery."));
-        bIsAtBakery = true;
+        if (TargetBakery)
+        {
+            auto* AI_Controller = Cast<AAIController>(GetController());
+            if (AI_Controller)
+            {
+                if (AI_Controller->GetMoveStatus() != EPathFollowingStatus::Waiting && AI_Controller->GetMoveStatus() != EPathFollowingStatus::Moving)
+                {
+                    MAGCF_AI(TEXT("Requesting movement path to bakery."));
+                    AI_Controller->MoveToActor(TargetBakery, 100.0f);
+                }
+                float DistanceToTarget = GetDistanceTo(TargetBakery);
+                if (DistanceToTarget <= 150.0f)
+                {
+                    bIsAtBakery = true;
+                    AI_Controller->StopMovement();
+                    MAGCF_AI(TEXT("Arrived at bakery physically. Starting interaction."));
+                }
+            }
+        }
+        else
+        {
+            MAGCF_WARNING(TEXT("Eat Goal executed, but TargetBakery is null reference!"));
+        }
         return;
     }
     float TargetPrice = TargetBakery ? TargetBakery->BreadPrice : 5.0f;

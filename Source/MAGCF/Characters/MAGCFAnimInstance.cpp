@@ -17,15 +17,19 @@
 //
 // ===============================================================================*/
 
-#pragma once
+#include "MAGCF/Characters/MAGCFAnimInstance.h"
+#include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 
-#include "CoreMinimal.h"
-#include "EGoals.generated.h"
-
-UENUM(BlueprintType)
-enum class EMAGCFGoal : uint8
+void UMAGCFAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
-	E_NONE,
-    E_EAT,
-	E_SLEEP
-};
+    Super::NativeUpdateAnimation(DeltaSeconds);
+
+    AActor* OwningActor = GetOwningActor();
+    if (ACharacter* Character = Cast<ACharacter>(OwningActor))
+    {
+        FVector Velocity = Character->GetVelocity();
+        GroundSpeed = Velocity.Size2D();
+        bIsMoving = (GroundSpeed > 3.0f);
+    }
+}
