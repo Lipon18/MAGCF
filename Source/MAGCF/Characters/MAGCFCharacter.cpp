@@ -1,33 +1,19 @@
-// /*===============================================================================
-//
-//
-// MAGCF - Multi-Agent Generative Character Framework
-//
-// Copyright (c) 2026 Your Lipon / Psycho Games.
-//
-// All Rights Reserved.
-//
-// MAGCF is an experimental research framework for autonomous AI-driven characters and multi-agent simulation within Unreal Engine
-// environments.
-//
-// Unauthorized copying, modification, distribution, or use of this software
-//
-// without explicit permission is prohibited.
-//
-//
-// ===============================================================================*/
+// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Your Lipon / Psycho Games. All Rights Reserved.
 
 #include "MAGCFCharacter.h"
 #include "MAGCF/MAGCF.h"
 #include "MAGCF/World/Buildings/MAGCFBakery.h"
 #include "MAGCF/MAGCFComponents/MAGCFNeedComponent.h"
 #include "AIController.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "MAGCF/MAGCFComponents/MAGCFAIComponent.h"
 
 AMAGCFCharacter::AMAGCFCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
     NeedComponent = CreateDefaultSubobject<UMAGCFNeedComponent>(TEXT("NeedComponent"));
+    LLMComponent = CreateDefaultSubobject<UMAGCFAIComponent>(TEXT("LLMComponent"));
 }
 
 void AMAGCFCharacter::BeginPlay()
@@ -35,14 +21,16 @@ void AMAGCFCharacter::BeginPlay()
     Super::BeginPlay();
 
     check(NeedComponent);
+    if (LLMComponent)
+    {
+        LLMComponent->OnLLMActionReceived.AddDynamic(this, &AMAGCFCharacter::HandleLLMActionCallback);
+    }
+
+    InitializeExecutionRegistries();
 
     if (PersonalityConfig)
     {
         MAGCF_NEED(*FString::Printf(TEXT("Character spawned using Archetype profile: %s"), *PersonalityConfig->ArchetypeName));
-    }
-    else
-    {
-        MAGCF_WARNING(TEXT("Character spawned without an assigned Personality Config Data Asset!"));
     }
 }
 
@@ -51,16 +39,29 @@ void AMAGCFCharacter::Tick(float DeltaTime)
     Super::Tick(DeltaTime);
 
     UpdateCurrentMoodState();
-
-    if (CurrentGoal == EMAGCFGoal::E_NONE && NeedComponent)
-    {
-        FName CriticalNeed;
-        if (NeedComponent->CheckIfAnyNeedIsCritical(CriticalNeed))
-        {
-            EvaluateNeed();
-        }
-    }
     ExecuteGoal();
+
+    /* if (CurrentGoal == EMAGCFGoal::E_NONE && NeedComponent)
+     {
+         FName CriticalNeed;
+         if (NeedComponent->CheckIfAnyNeedIsCritical(CriticalNeed))
+         {
+             EvaluateNeed();
+         }
+     }*/
+}
+
+void AMAGCFCharacter::InitializeExecutionRegistries()
+{
+    StringToGoalMap.Add(TEXT("E_EAT"), EMAGCFGoal::E_EAT);
+    StringToGoalMap.Add(TEXT("E_DANCE"), EMAGCFGoal::E_DANCE);
+    StringToGoalMap.Add(TEXT("E_TALK_TO_PHONE"), EMAGCFGoal::E_TALK_TO_PHONE);
+    StringToGoalMap.Add(TEXT("E_SIT_ON_BENCH"), EMAGCFGoal::E_SIT_ON_BENCH);  // Still catch if model chooses old name
+
+    // Map Enum States directly to executable C++ lambda functions (Replacing the Switch statement)
+    GoalExecutionMap.Add(EMAGCFGoal::E_EAT, [this]() { HandleEatGoal(); });
+    GoalExecutionMap.Add(EMAGCFGoal::E_DANCE, [this]() { HandleDanceGoal(); });
+    GoalExecutionMap.Add(EMAGCFGoal::E_SIT_ON_BENCH, [this]() { HandleSitOnGroundGoal(); });
 }
 
 void AMAGCFCharacter::UpdateCurrentMoodState()
@@ -116,108 +117,48 @@ void AMAGCFCharacter::EvaluateNeed()
 
 void AMAGCFCharacter::ExecuteGoal()
 {
-    switch (CurrentGoal)
+    if (TFunction<void()>* GoalRoutine = GoalExecutionMap.Find(CurrentGoal))
     {
-        case EMAGCFGoal::E_EAT: HandleEatGoal(); break;
-        case EMAGCFGoal::E_DANCE: HandleDanceGoal(); break;
-        case EMAGCFGoal::E_SIT_ON_BENCH: HandleSitOnBenchGoal(); break;
-        case EMAGCFGoal::E_TALK_TO_PHONE: HandleTalkToPhoneGoal(); break;
-        default: break;
+        (*GoalRoutine)();
     }
 }
 
 void AMAGCFCharacter::HandleDanceGoal()
 {
     if (bIsPlayingActionMontage) return;
-
-    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-    if (AnimInstance && DanceMontage)
+    if (InternalPlayActionMontage(DanceMontage, TEXT("OnActionMontageEnded")))
     {
-        bIsPlayingActionMontage = true;
-        float Length = AnimInstance->Montage_Play(DanceMontage);
-        FOnMontageEnded EndDelegate;
-        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
-        AnimInstance->Montage_SetEndDelegate(EndDelegate, DanceMontage);
         MAGCF_AI(TEXT("Began dancing routine out of absolute happiness."));
     }
     else
     {
-        bIsPlayingActionMontage = false;
         CurrentGoal = EMAGCFGoal::E_NONE;
     }
 }
 
-void AMAGCFCharacter::HandleSitOnBenchGoal()
+void AMAGCFCharacter::HandleSitOnGroundGoal()
 {
-    if (!TargetBench)
-    {
-        MAGCF_WARNING(TEXT("No physical bench assigned in map workspace. Simulating structural rest."));
-        if (NeedComponent)
-        {
-            NeedComponent->SatisfyNeed(TEXT("Energy"), 40.0f);
-        }
-        CurrentGoal = EMAGCFGoal::E_NONE;
-        return;
-    }
-
-    if (!bIsAtBench)
-    {
-        auto* AI_Controller = Cast<AAIController>(GetController());
-        if (AI_Controller)
-        {
-            if (AI_Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
-            {
-                FAIMoveRequest MoveRequest;
-                MoveRequest.SetGoalActor(TargetBench);
-                MoveRequest.SetAcceptanceRadius(120.0f);
-                MoveRequest.SetUsePathfinding(true);
-                MoveRequest.SetAllowPartialPath(true);
-                FPathFollowingRequestResult Result = AI_Controller->MoveTo(MoveRequest);
-                if (Result.Code == EPathFollowingRequestResult::AlreadyAtGoal)
-                {
-                    bIsAtBench = true;
-                }
-                else if (Result.Code == EPathFollowingRequestResult::Failed)
-                {
-                    MAGCF_WARNING(TEXT("Bench pathing failed instantly. Aborting goal gracefully."));
-                    CurrentGoal = EMAGCFGoal::E_NONE;  // Reset state
-                }
-            }
-        }
-        return;
-    }
-
     if (bIsPlayingActionMontage) return;
 
-    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-    if (AnimInstance && BenchSitMontage)
+    MAGCF_AI(TEXT("Initiating sitting sequence directly on the floor terrain baseline..."));
+    HaltCharacterVelocity();
+    SetActorEnableCollision(true);
+    if (!InternalPlayActionMontage(GroundSitMontage, TEXT("OnActionMontageEnded")))
     {
-        bIsPlayingActionMontage = true;
-        SetActorEnableCollision(false);
-        AnimInstance->Montage_Play(BenchSitMontage);
-        FOnMontageEnded EndDelegate;
-        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
-        AnimInstance->Montage_SetEndDelegate(EndDelegate, BenchSitMontage);
+        if (GetCharacterMovement()) GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+        CurrentGoal = EMAGCFGoal::E_NONE;
     }
 }
 
 void AMAGCFCharacter::HandleTalkToPhoneGoal()
 {
     if (bIsPlayingActionMontage) return;
-
-    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-    if (AnimInstance && PhoneMontage)
+    if (InternalPlayActionMontage(PhoneMontage, TEXT("OnActionMontageEnded")))
     {
-        bIsPlayingActionMontage = true;
-        float Length = AnimInstance->Montage_Play(PhoneMontage);
-        FOnMontageEnded EndDelegate;
-        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
-        AnimInstance->Montage_SetEndDelegate(EndDelegate, PhoneMontage);
         MAGCF_AI(TEXT("Pulling out phone to dial a direct social companion."));
     }
     else
     {
-        bIsPlayingActionMontage = false;
         CurrentGoal = EMAGCFGoal::E_NONE;
     }
 }
@@ -290,8 +231,7 @@ void AMAGCFCharacter::StartEatingSequence()
             SpawnedBreadActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocketName);
         }
     }
-    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
-    if (AnimInstance)
+    if (auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
     {
         AnimInstance->Montage_Play(EatMontage);
         FOnMontageEnded MontageEndedDelegate;
@@ -307,38 +247,61 @@ void AMAGCFCharacter::OnEatMontageEnded(UAnimMontage* Montage, bool bInterrupted
         SpawnedBreadActor->Destroy();
         SpawnedBreadActor = nullptr;
     }
-    if (NeedComponent)
-    {
-        NeedComponent->SatisfyNeed(TEXT("Hunger"), 50.0f);
-    }
+    if (NeedComponent) NeedComponent->SatisfyNeed(TEXT("Hunger"), 50.0f);
+
     bHasBread = false;
     bIsAtBakery = false;
     CurrentGoal = EMAGCFGoal::E_NONE;
     MAGCF_NEED(TEXT("Finished eating bread animation. Framework state reset."));
 }
 
+bool AMAGCFCharacter::InternalPlayActionMontage(UAnimMontage* TargetMontage, FName EndWorkerFunctionName)
+{
+    if (bIsPlayingActionMontage || !TargetMontage) return false;
+
+    if (auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr)
+    {
+        bIsPlayingActionMontage = true;
+        AnimInstance->Montage_Play(TargetMontage);
+        FOnMontageEnded EndDelegate;
+        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
+        AnimInstance->Montage_SetEndDelegate(EndDelegate, TargetMontage);
+        return true;
+    }
+    return false;
+}
+
+void AMAGCFCharacter::HaltCharacterVelocity()
+{
+    if (auto* AI_Controller = Cast<AAIController>(GetController()))
+    {
+        AI_Controller->StopMovement();
+    }
+    if (GetCharacterMovement())
+    {
+        GetCharacterMovement()->DisableMovement();
+        GetCharacterMovement()->StopMovementImmediately();
+    }
+}
+
 void AMAGCFCharacter::OnActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
 {
     bIsPlayingActionMontage = false;
-    SetActorEnableCollision(true);
+
+    if (GetCharacterMovement())
+    {
+        GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+    }
 
     if (NeedComponent)
     {
         if (Montage == DanceMontage)
-        {
             NeedComponent->SatisfyNeed(TEXT("Fun"), 50.0f);
-        }
         else if (Montage == PhoneMontage)
-        {
             NeedComponent->SatisfyNeed(TEXT("Fun"), 35.0f);
-        }
-        else if (Montage == BenchSitMontage)
-        {
+        else if (Montage == GroundSitMontage)
             NeedComponent->SatisfyNeed(TEXT("Energy"), 60.0f);
-        }
     }
-
-    bIsAtBench = false;
     CurrentGoal = EMAGCFGoal::E_NONE;
     MAGCF_AI(TEXT("Completed custom physical action montage routine. State vectors cleared."));
 }
@@ -387,10 +350,26 @@ FString AMAGCFCharacter::CompileLLMContextPayload() const
                                 "  \"AllowedActionSchema\": [\n"
                                 "    {\"Action\": \"E_EAT\", \"Description\": \"Triggered when Hunger is high or mood profile returns Neutral.\", \"Prerequisite\": \"Available Wallet Capital >= Price\"},\n"
                                 "    {\"Action\": \"E_DANCE\", \"Description\": \"Triggered out of absolute comfort when target is structurally Happy.\", \"Prerequisite\": \"None\"},\n"
-                                "    {\"Action\": \"E_SIT_ON_BENCH\", \"Description\": \"Triggered when systemic Energy drops low to initiate resting protocols.\", \"Prerequisite\": \"TargetBench reference present in scene layout\"},\n"
+                                "    {\"Action\": \"E_SIT_ON_BENCH\", \"Description\": \"Triggered when systemic Energy drops low to drop and rest sitting on the ground directly.\", \"Prerequisite\": \"None\"},\n"
                                 "    {\"Action\": \"E_TALK_TO_PHONE\", \"Description\": \"Dial up a direct social companion to reduce accumulated Boredom values.\", \"Prerequisite\": \"None\"}\n"
                                 "  ]\n"
                                 "}"),
         *Archetype, *FormattedTags, Social, Strength, Spend, PatienceVal, Calmness, *Flavor, ThresholdPrice, *ExtractedNeedsMapData, Money,
         *MoodString);
+}
+
+void AMAGCFCharacter::HandleLLMActionCallback(FString Action, FString TargetDetails)
+{
+    MAGCF_AI(*FString::Printf(TEXT("LLM Brain completed evaluation. Parsed Action: %s"), *Action));
+    bIsAtBakery = false;
+
+    if (EMAGCFGoal* FoundGoal = StringToGoalMap.Find(Action))
+    {
+        CurrentGoal = *FoundGoal;
+    }
+    else
+    {
+        CurrentGoal = EMAGCFGoal::E_NONE;
+    }
+    CurrentGoal = EMAGCFGoal::E_NONE;
 }

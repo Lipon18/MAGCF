@@ -1,27 +1,6 @@
 Multi-Agent Generative Character Framework (MAGCF)
 
 
-// /*===============================================================================
-//
-//
-// MAGCF - Multi-Agent Generative Character Framework
-//
-// Copyright (c) 2026 Your Lipon / Psycho Games.
-//
-// All Rights Reserved.
-//
-// MAGCF is an experimental research framework for autonomous AI-driven characters and multi-agent simulation within Unreal Engine
-// environments.
-//
-// Unauthorized copying, modification, distribution, or use of this software
-//
-// without explicit permission is prohibited.
-//
-//
-// ===============================================================================*/
-
-
-
 Source/MAGCF/
 │
 ├── Characters/
@@ -55,3 +34,21 @@ Source/MAGCF/
 └── Simulation/
     ├── GameMode
     ├── Spawner
+
+
+
+[Need Component] ──> Decays over time (Hunger/Energy/Fun changes)
+         │
+         ▼
+[AMAGCFCharacter] ──(Compiles JSON)──> [UMAGCFAIComponent]
+                                              │
+                                       (HTTP POST Request)
+                                              │
+                                              ▼
+                                    [Google AI Studio] (Gemini)
+                                              │
+                                    (Returns JSON Response)
+                                              │
+                                              ▼
+[AMAGCFCharacter] <──(Broadcast)─────── [Process Output]
+  (Executes Montage)

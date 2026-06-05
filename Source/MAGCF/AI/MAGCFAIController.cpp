@@ -23,7 +23,7 @@
 #include "MAGCF/Characters/MAGCFCharacter.h"
 #include "Navigation/PathFollowingComponent.h"
 
-AMAGCFAIController::AMAGCFAIController() 
+AMAGCFAIController::AMAGCFAIController()
 {
     PerceptionComp = CreateDefaultSubobject<UAIPerceptionComponent>(TEXT("PerceptionComp"));
     SightConfig = CreateDefaultSubobject<UAISenseConfig_Sight>(TEXT("SightConfig"));
@@ -43,12 +43,12 @@ AMAGCFAIController::AMAGCFAIController()
     }
 }
 
-void AMAGCFAIController::BeginPlay() 
+void AMAGCFAIController::BeginPlay()
 {
     Super::BeginPlay();
 }
 
-void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) 
+void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
     Super::OnMoveCompleted(RequestID, Result);
 
@@ -61,10 +61,6 @@ void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFoll
         {
             ControlledChar->SetIsAtBakery(true);
         }
-        else if (ControlledChar->GetCurrentGoal() == EMAGCFGoal::E_SIT_ON_BENCH)
-        {
-            ControlledChar->SetIsAtBench(true);
-        }
 
         ControlledChar->ForceExecuteGoal();
     }
@@ -72,12 +68,11 @@ void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFoll
     {
         UE_LOG(LogTemp, Warning, TEXT("AI framework navigation path tracking failed. Resetting goal context."));
         ControlledChar->SetCurrentGoal(EMAGCFGoal::E_NONE);
-        ControlledChar->SetIsAtBench(false);
         ControlledChar->SetIsAtBakery(false);
     }
 }
 
-void AMAGCFAIController::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors) 
+void AMAGCFAIController::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
     for (auto* Actor : UpdatedActors)
     {

@@ -1,21 +1,4 @@
-// /*===============================================================================
-//
-//
-// MAGCF - Multi-Agent Generative Character Framework
-//
-// Copyright (c) 2026 Your Lipon / Psycho Games.
-//
-// All Rights Reserved.
-//
-// MAGCF is an experimental research framework for autonomous AI-driven characters and multi-agent simulation within Unreal Engine
-// environments.
-//
-// Unauthorized copying, modification, distribution, or use of this software
-//
-// without explicit permission is prohibited.
-//
-//
-// ===============================================================================*/
+// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Your Lipon / Psycho Games. All Rights Reserved.
 
 #pragma once
 
@@ -28,6 +11,7 @@
 class AMAGCFBakery;
 class UMAGCFNeedComponent;
 class UAnimMontage;
+class UMAGCFAIComponent;
 
 UCLASS()
 class MAGCF_API AMAGCFCharacter : public ACharacter
@@ -44,9 +28,12 @@ public:
     void ForceExecuteGoal() { ExecuteGoal(); }
     void StartEatingSequence();
 
+    FString CompileLLMContextPayload() const;
+
     FORCEINLINE EMAGCFGoal GetCurrentGoal() const { return CurrentGoal; }
     FORCEINLINE void SetCurrentGoal(EMAGCFGoal NewGoal) { CurrentGoal = NewGoal; }
     FORCEINLINE void SetIsAtBench(bool bAtBench) { bIsAtBench = bAtBench; }
+    FORCEINLINE UMAGCFNeedComponent* GetNeedComponent() const { return NeedComponent; }
 
 protected:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MAGCF|AI|Configuration")
@@ -54,6 +41,9 @@ protected:
 
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MAGCF|AI|Components")
     UMAGCFNeedComponent* NeedComponent = nullptr;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MAGCF|AI|Components")
+    UMAGCFAIComponent* LLMComponent = nullptr;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MAGCF|AI|Animations")
     TObjectPtr<UAnimMontage> EatMontage = nullptr;
@@ -65,7 +55,7 @@ protected:
     TObjectPtr<UAnimMontage> PhoneMontage = nullptr;
 
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MAGCF|AI|Animations")
-    TObjectPtr<UAnimMontage> BenchSitMontage = nullptr;
+    TObjectPtr<UAnimMontage> GroundSitMontage = nullptr;
 
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MAGCF|AI|Configuration")
     FName HandSocketName = TEXT("Hand_R_Socket");
@@ -81,9 +71,6 @@ protected:
 
     UPROPERTY(EditAnywhere, Category = "MAGCF|World")
     AMAGCFBakery* TargetBakery = nullptr;
-
-    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MAGCF|World")
-    TObjectPtr<AActor> TargetBench = nullptr;
 
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MAGCF|Economy")
     float Money = 20.0f;
@@ -103,16 +90,24 @@ protected:
 
     void HandleEatGoal();
     void HandleDanceGoal();
-    void HandleSitOnBenchGoal();
+    void HandleSitOnGroundGoal();
     void HandleTalkToPhoneGoal();
 
-    FString CompileLLMContextPayload() const;
+    UFUNCTION()
+    void HandleLLMActionCallback(FString Action, FString TargetDetails);
 
 private:
     UPROPERTY()
     AActor* SpawnedBreadActor = nullptr;
 
     bool bIsPlayingActionMontage = false;
+
+    TMap<EMAGCFGoal, TFunction<void()>> GoalExecutionMap;
+    TMap<FString, EMAGCFGoal> StringToGoalMap;
+
+    void InitializeExecutionRegistries();
+    bool InternalPlayActionMontage(UAnimMontage* TargetMontage, FName EndWorkerFunctionName);
+    void HaltCharacterVelocity();
 
    UFUNCTION()
    void OnEatMontageEnded(UAnimMontage* Montage, bool bInterrupted);
