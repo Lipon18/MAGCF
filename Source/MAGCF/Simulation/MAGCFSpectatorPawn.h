@@ -20,19 +20,25 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
-#include "MAGCFGameModeBase.generated.h"
+#include "GameFramework/SpectatorPawn.h"
+#include "MAGCFSpectatorPawn.generated.h"
 
-/**
- *
- */
+class UCameraComponent;
+
 UCLASS()
-class MAGCF_API AMAGCFGameModeBase : public AGameModeBase
+class MAGCF_API AMAGCFSpectatorPawn : public ASpectatorPawn
 {
     GENERATED_BODY()
 
 public:
-    AMAGCFGameModeBase();
+    AMAGCFSpectatorPawn();
 
+protected:
     virtual void BeginPlay() override;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MAGCF|Spectator")
+    TObjectPtr<UCameraComponent> CameraComp;
+
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "MAGCF|Spectator")
+    float FastMoveSpeedMultiplier = 2.5f;
 };

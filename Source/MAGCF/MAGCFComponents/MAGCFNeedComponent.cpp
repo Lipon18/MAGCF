@@ -30,12 +30,27 @@ void UMAGCFNeedComponent::BeginPlay()
 
     FNPCNeedState HungerNeed;
     HungerNeed.NeedName = TEXT("Hunger");
-    HungerNeed.CurrentValue = 85.0f;
+    HungerNeed.CurrentValue = 20.0f;
     HungerNeed.MaxValue = 100.0f;
     HungerNeed.DrainRate = 2.0f;
     HungerNeed.CriticalThreshold = 80.0f;
-
     TrackedNeeds.Add(TEXT("Hunger"), HungerNeed);
+
+    FNPCNeedState EnergyNeed;
+    EnergyNeed.NeedName = TEXT("Energy");
+    EnergyNeed.CurrentValue = 10.0f;
+    EnergyNeed.MaxValue = 100.0f;
+    EnergyNeed.DrainRate = 1.0f;
+    EnergyNeed.CriticalThreshold = 75.0f;
+    TrackedNeeds.Add(TEXT("Energy"), EnergyNeed);
+
+    FNPCNeedState FunNeed;
+    FunNeed.NeedName = TEXT("Fun");
+    FunNeed.CurrentValue = 30.0f;
+    FunNeed.MaxValue = 100.0f;
+    FunNeed.DrainRate = 2.5f;
+    FunNeed.CriticalThreshold = 70.0f;
+    TrackedNeeds.Add(TEXT("Fun"), FunNeed);
 }
 
 void UMAGCFNeedComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -65,12 +80,17 @@ void UMAGCFNeedComponent::SatisfyNeed(FName NeedName, float Amount)
 
 bool UMAGCFNeedComponent::CheckIfAnyNeedIsCritical(FName& OutCriticalNeedName)
 {
-    for (const auto& Element : TrackedNeeds)
+    TArray<FName> PriorityChecklist = {TEXT("Hungry"), TEXT("Energy"), TEXT("Fun")};
+
+    for (const FName& NeedName : PriorityChecklist)
     {
-        if (Element.Value.CurrentValue >= Element.Value.CriticalThreshold)
+        if (auto* Need = TrackedNeeds.Find(NeedName))
         {
-            OutCriticalNeedName = Element.Key;
-            return true;
+            if (Need->CurrentValue >= Need->CriticalThreshold)
+            {
+                OutCriticalNeedName = NeedName;
+                return true;
+            }
         }
     }
     return false;

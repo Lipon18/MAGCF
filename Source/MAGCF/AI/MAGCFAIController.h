@@ -40,6 +40,8 @@ public:
     AMAGCFBakery* GetKnownBakeryLocation() const { return CachedBakeryTarget; }
 
 protected:
+    virtual void OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) override;
+
     UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MAGCF|Perception")
     TObjectPtr<UAIPerceptionComponent> PerceptionComp;
 

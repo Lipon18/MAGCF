@@ -3,7 +3,7 @@
 //
 // MAGCF - Multi-Agent Generative Character Framework
 //
-// Copyright (c) 2026 Your Lipon / Psycho Games.
+// Copyright (c) 2026 Lipon / Psycho Games.
 //
 // All Rights Reserved.
 //
@@ -18,12 +18,12 @@
 // ===============================================================================*/
 
 #include "MAGCFGameModeBase.h"
-#include "MAGCF/Characters/MAGCFCharacter.h"
+#include "MAGCFSpectatorPawn.h"
 #include "MAGCF/MAGCF.h"
 
 AMAGCFGameModeBase::AMAGCFGameModeBase() 
 {
-    DefaultPawnClass = AMAGCFCharacter::StaticClass();
+    DefaultPawnClass = AMAGCFSpectatorPawn::StaticClass();
 }
 
 void AMAGCFGameModeBase::BeginPlay()

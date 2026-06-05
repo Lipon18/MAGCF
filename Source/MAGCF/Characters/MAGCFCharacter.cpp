@@ -27,7 +27,6 @@
 AMAGCFCharacter::AMAGCFCharacter()
 {
     PrimaryActorTick.bCanEverTick = true;
-
     NeedComponent = CreateDefaultSubobject<UMAGCFNeedComponent>(TEXT("NeedComponent"));
 }
 
@@ -51,24 +50,68 @@ void AMAGCFCharacter::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
+    UpdateCurrentMoodState();
+
     if (CurrentGoal == EMAGCFGoal::E_NONE && NeedComponent)
     {
         FName CriticalNeed;
         if (NeedComponent->CheckIfAnyNeedIsCritical(CriticalNeed))
         {
-            if (CriticalNeed == TEXT("Hunger"))
-            {
-                EvaluateNeed();
-            }
+            EvaluateNeed();
         }
     }
     ExecuteGoal();
 }
 
+void AMAGCFCharacter::UpdateCurrentMoodState()
+{
+    if (!NeedComponent) return;
+
+    auto* Hunger = NeedComponent->GetNeed(TEXT("Hunger"));
+    auto* Energy = NeedComponent->GetNeed(TEXT("Energy"));
+    auto* Fun = NeedComponent->GetNeed(TEXT("Fun"));
+
+    CurrentMood = EMAGCFMood::E_NEUTRAL;
+
+    if (Energy && Energy->CurrentValue > 65.0f)
+    {
+        CurrentMood = EMAGCFMood::E_TIRED;
+    }
+    else if (Fun && Fun->CurrentValue > 60.0f)
+    {
+        CurrentMood = EMAGCFMood::E_BORED;
+    }
+    else if (Hunger && Hunger->CurrentValue < 30.0f && Fun && Fun->CurrentValue < 30.0f)
+    {
+        CurrentMood = EMAGCFMood::E_HAPPY;
+    }
+}
+
 void AMAGCFCharacter::EvaluateNeed()
 {
-    CurrentGoal = EMAGCFGoal::E_EAT;
-    MAGCF_AI(TEXT("Selected Eat Goal"));
+    switch (CurrentMood)
+    {
+        case EMAGCFMood::E_HAPPY:
+            CurrentGoal = EMAGCFGoal::E_DANCE;
+            MAGCF_AI(TEXT("Mood Profile is HAPPY: Selecting Dance action routine."));
+            break;
+
+        case EMAGCFMood::E_TIRED:
+            CurrentGoal = EMAGCFGoal::E_SIT_ON_BENCH;
+            MAGCF_AI(TEXT("Mood Profile is TIRED: Selecting Sit On Bench action routine."));
+            break;
+
+        case EMAGCFMood::E_BORED:
+            CurrentGoal = EMAGCFGoal::E_TALK_TO_PHONE;
+            MAGCF_AI(TEXT("Mood Profile is BORED: Selecting Phone call interaction."));
+            break;
+
+        case EMAGCFMood::E_NEUTRAL:
+        default:
+            CurrentGoal = EMAGCFGoal::E_EAT;
+            MAGCF_AI(TEXT("Mood Profile is NEUTRAL/HUNGRY: Standard routing to food source."));
+            break;
+    }
 }
 
 void AMAGCFCharacter::ExecuteGoal()
@@ -76,7 +119,106 @@ void AMAGCFCharacter::ExecuteGoal()
     switch (CurrentGoal)
     {
         case EMAGCFGoal::E_EAT: HandleEatGoal(); break;
+        case EMAGCFGoal::E_DANCE: HandleDanceGoal(); break;
+        case EMAGCFGoal::E_SIT_ON_BENCH: HandleSitOnBenchGoal(); break;
+        case EMAGCFGoal::E_TALK_TO_PHONE: HandleTalkToPhoneGoal(); break;
         default: break;
+    }
+}
+
+void AMAGCFCharacter::HandleDanceGoal()
+{
+    if (bIsPlayingActionMontage) return;
+
+    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (AnimInstance && DanceMontage)
+    {
+        bIsPlayingActionMontage = true;
+        float Length = AnimInstance->Montage_Play(DanceMontage);
+        FOnMontageEnded EndDelegate;
+        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
+        AnimInstance->Montage_SetEndDelegate(EndDelegate, DanceMontage);
+        MAGCF_AI(TEXT("Began dancing routine out of absolute happiness."));
+    }
+    else
+    {
+        bIsPlayingActionMontage = false;
+        CurrentGoal = EMAGCFGoal::E_NONE;
+    }
+}
+
+void AMAGCFCharacter::HandleSitOnBenchGoal()
+{
+    if (!TargetBench)
+    {
+        MAGCF_WARNING(TEXT("No physical bench assigned in map workspace. Simulating structural rest."));
+        if (NeedComponent)
+        {
+            NeedComponent->SatisfyNeed(TEXT("Energy"), 40.0f);
+        }
+        CurrentGoal = EMAGCFGoal::E_NONE;
+        return;
+    }
+
+    if (!bIsAtBench)
+    {
+        auto* AI_Controller = Cast<AAIController>(GetController());
+        if (AI_Controller)
+        {
+            if (AI_Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
+            {
+                FAIMoveRequest MoveRequest;
+                MoveRequest.SetGoalActor(TargetBench);
+                MoveRequest.SetAcceptanceRadius(120.0f);
+                MoveRequest.SetUsePathfinding(true);
+                MoveRequest.SetAllowPartialPath(true);
+                FPathFollowingRequestResult Result = AI_Controller->MoveTo(MoveRequest);
+                if (Result.Code == EPathFollowingRequestResult::AlreadyAtGoal)
+                {
+                    bIsAtBench = true;
+                }
+                else if (Result.Code == EPathFollowingRequestResult::Failed)
+                {
+                    MAGCF_WARNING(TEXT("Bench pathing failed instantly. Aborting goal gracefully."));
+                    CurrentGoal = EMAGCFGoal::E_NONE;  // Reset state
+                }
+            }
+        }
+        return;
+    }
+
+    if (bIsPlayingActionMontage) return;
+
+    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (AnimInstance && BenchSitMontage)
+    {
+        bIsPlayingActionMontage = true;
+        SetActorEnableCollision(false);
+        AnimInstance->Montage_Play(BenchSitMontage);
+        FOnMontageEnded EndDelegate;
+        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
+        AnimInstance->Montage_SetEndDelegate(EndDelegate, BenchSitMontage);
+    }
+}
+
+void AMAGCFCharacter::HandleTalkToPhoneGoal()
+{
+    if (bIsPlayingActionMontage) return;
+
+    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (AnimInstance && PhoneMontage)
+    {
+        bIsPlayingActionMontage = true;
+        float Length = AnimInstance->Montage_Play(PhoneMontage);
+        FOnMontageEnded EndDelegate;
+        EndDelegate.BindUObject(this, &AMAGCFCharacter::OnActionMontageEnded);
+        AnimInstance->Montage_SetEndDelegate(EndDelegate, PhoneMontage);
+        MAGCF_AI(TEXT("Pulling out phone to dial a direct social companion."));
+    }
+    else
+    {
+        bIsPlayingActionMontage = false;
+        CurrentGoal = EMAGCFGoal::E_NONE;
     }
 }
 
@@ -84,67 +226,121 @@ void AMAGCFCharacter::HandleEatGoal()
 {
     if (!bIsAtBakery)
     {
-        if (TargetBakery)
+        auto* AI_Controller = Cast<AAIController>(GetController());
+        if (AI_Controller)
         {
-            auto* AI_Controller = Cast<AAIController>(GetController());
-            if (AI_Controller)
+            if (AI_Controller->GetMoveStatus() == EPathFollowingStatus::Idle)
             {
-                if (AI_Controller->GetMoveStatus() != EPathFollowingStatus::Waiting && AI_Controller->GetMoveStatus() != EPathFollowingStatus::Moving)
-                {
-                    MAGCF_AI(TEXT("Requesting movement path to bakery."));
-                    AI_Controller->MoveToActor(TargetBakery, 100.0f);
-                }
-                float DistanceToTarget = GetDistanceTo(TargetBakery);
-                if (DistanceToTarget <= 150.0f)
+                MAGCF_AI(TEXT("Requesting movement path to bakery."));
+                FAIMoveRequest MoveRequest;
+                MoveRequest.SetGoalActor(TargetBakery);
+                MoveRequest.SetAcceptanceRadius(80.0f);
+                MoveRequest.SetUsePathfinding(true);
+                MoveRequest.SetAllowPartialPath(false);
+                FPathFollowingRequestResult Result = AI_Controller->MoveTo(MoveRequest);
+
+                if (Result.Code == EPathFollowingRequestResult::AlreadyAtGoal)
                 {
                     bIsAtBakery = true;
-                    AI_Controller->StopMovement();
-                    MAGCF_AI(TEXT("Arrived at bakery physically. Starting interaction."));
+                    MAGCF_AI(TEXT("NPC is already at the bakery. Skipping walk."));
                 }
             }
         }
-        else
-        {
-            MAGCF_WARNING(TEXT("Eat Goal executed, but TargetBakery is null reference!"));
-        }
         return;
     }
+
     float TargetPrice = TargetBakery ? TargetBakery->BreadPrice : 5.0f;
 
     if (!bHasBread)
     {
         FString CurrentContextJSON = CompileLLMContextPayload();
         MAGCF_LLM(*FString::Printf(TEXT("Current Snapshot Context Vector:\n%s"), *CurrentContextJSON));
-        if (PersonalityConfig)
-        {
-            if (TargetPrice > PersonalityConfig->PriceThreshold)
-            {
-                FString ReactionType = (PersonalityConfig->Stability < 0.4f) ? TEXT("panics nervously") : TEXT("grumpily evaluates code");
-                FString StrengthType = (PersonalityConfig->Fortitude < 0.4f) ? TEXT("weakly surrenders") : TEXT("stoutly persists");
-                MAGCF_AI(
-                    *FString::Printf(TEXT("Price Check Simulation: John notices item costs %.2f. Profile limits says %.2f. He %s and %s."),
-                        TargetPrice, PersonalityConfig->PriceThreshold, *ReactionType, *StrengthType));
-            }
-        }
         if (Money >= TargetPrice)
         {
             Money -= TargetPrice;
             bHasBread = true;
-            MAGCF_ECONOMY(TEXT("Bought Bread"));
+            StartEatingSequence();
         }
         return;
     }
-    if (bHasBread)
+}
+
+void AMAGCFCharacter::StartEatingSequence()
+{
+    if (!EatMontage)
     {
         if (NeedComponent)
         {
             NeedComponent->SatisfyNeed(TEXT("Hunger"), 50.0f);
         }
         bHasBread = false;
-        MAGCF_NEED(TEXT("Ate Bread"));
         CurrentGoal = EMAGCFGoal::E_NONE;
         bIsAtBakery = false;
+        return;
     }
+    if (BreadClass && GetMesh())
+    {
+        FActorSpawnParameters SpawnParams;
+        SpawnParams.Owner = this;
+        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+        SpawnedBreadActor = GetWorld()->SpawnActor<AActor>(BreadClass, GetActorLocation(), GetActorRotation(), SpawnParams);
+        if (SpawnedBreadActor)
+        {
+            SpawnedBreadActor->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetNotIncludingScale, HandSocketName);
+        }
+    }
+    auto* AnimInstance = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+    if (AnimInstance)
+    {
+        AnimInstance->Montage_Play(EatMontage);
+        FOnMontageEnded MontageEndedDelegate;
+        MontageEndedDelegate.BindUObject(this, &AMAGCFCharacter::OnEatMontageEnded);
+        AnimInstance->Montage_SetEndDelegate(MontageEndedDelegate, EatMontage);
+    }
+}
+
+void AMAGCFCharacter::OnEatMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+    if (SpawnedBreadActor)
+    {
+        SpawnedBreadActor->Destroy();
+        SpawnedBreadActor = nullptr;
+    }
+    if (NeedComponent)
+    {
+        NeedComponent->SatisfyNeed(TEXT("Hunger"), 50.0f);
+    }
+    bHasBread = false;
+    bIsAtBakery = false;
+    CurrentGoal = EMAGCFGoal::E_NONE;
+    MAGCF_NEED(TEXT("Finished eating bread animation. Framework state reset."));
+}
+
+void AMAGCFCharacter::OnActionMontageEnded(UAnimMontage* Montage, bool bInterrupted)
+{
+    bIsPlayingActionMontage = false;
+    SetActorEnableCollision(true);
+
+    if (NeedComponent)
+    {
+        if (Montage == DanceMontage)
+        {
+            NeedComponent->SatisfyNeed(TEXT("Fun"), 50.0f);
+        }
+        else if (Montage == PhoneMontage)
+        {
+            NeedComponent->SatisfyNeed(TEXT("Fun"), 35.0f);
+        }
+        else if (Montage == BenchSitMontage)
+        {
+            NeedComponent->SatisfyNeed(TEXT("Energy"), 60.0f);
+        }
+    }
+
+    bIsAtBench = false;
+    CurrentGoal = EMAGCFGoal::E_NONE;
+    MAGCF_AI(TEXT("Completed custom physical action montage routine. State vectors cleared."));
 }
 
 FString AMAGCFCharacter::CompileLLMContextPayload() const
@@ -175,13 +371,26 @@ FString AMAGCFCharacter::CompileLLMContextPayload() const
 
     FString ExtractedNeedsMapData = NeedComponent ? NeedComponent->GetNeedsAsJSONString() : TEXT("\"Hunger\": 0.00");
 
+    FString MoodString = TEXT("Neutral");
+    switch (CurrentMood)
+    {
+        case EMAGCFMood::E_HAPPY: MoodString = TEXT("Happy"); break;
+        case EMAGCFMood::E_TIRED: MoodString = TEXT("Tired"); break;
+        case EMAGCFMood::E_BORED: MoodString = TEXT("Bored"); break;
+        default: break;
+    }
     return FString::Printf(TEXT("{\n"
                                 "  \"Identity\": {\"Archetype\": \"%s\", \"Tags\": [%s]},\n"
-                                "  \"Psychology\": {\"IntroversionExtroversion\": %.2f, \"StrengthFortitude\": %.2f, "
-                                "\"FrugalityExtravagance\": %.2f, \"Patience\": %.2f, \"EmotionalStability\": %.2f},\n"
+                                "  \"Psychology\": {\"IntroversionExtroversion\": %.2f, \"StrengthFortitude\": %.2f, \"FrugalityExtravagance\": %.2f, \"Patience\": %.2f, \"EmotionalStability\": %.2f},\n"
                                 "  \"Taste\": {\"PreferredFlavor\": \"%s\", \"ComfortPriceLimit\": %.2f},\n"
-                                "  \"LiveState\": {\"Hunger\": %.2f, \"WalletBalance\": %.2f, \"CarryingFood\": %s}\n"
+                                "  \"LiveState\": {%s, \"WalletBalance\": %.2f, \"CurrentMoodProfile\": \"%s\"},\n"
+                                "  \"AllowedActionSchema\": [\n"
+                                "    {\"Action\": \"E_EAT\", \"Description\": \"Triggered when Hunger is high or mood profile returns Neutral.\", \"Prerequisite\": \"Available Wallet Capital >= Price\"},\n"
+                                "    {\"Action\": \"E_DANCE\", \"Description\": \"Triggered out of absolute comfort when target is structurally Happy.\", \"Prerequisite\": \"None\"},\n"
+                                "    {\"Action\": \"E_SIT_ON_BENCH\", \"Description\": \"Triggered when systemic Energy drops low to initiate resting protocols.\", \"Prerequisite\": \"TargetBench reference present in scene layout\"},\n"
+                                "    {\"Action\": \"E_TALK_TO_PHONE\", \"Description\": \"Dial up a direct social companion to reduce accumulated Boredom values.\", \"Prerequisite\": \"None\"}\n"
+                                "  ]\n"
                                 "}"),
         *Archetype, *FormattedTags, Social, Strength, Spend, PatienceVal, Calmness, *Flavor, ThresholdPrice, *ExtractedNeedsMapData, Money,
-        bHasBread ? TEXT("true") : TEXT("false"));
+        *MoodString);
 }

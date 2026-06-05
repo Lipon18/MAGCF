@@ -1,9 +1,7 @@
 // /*===============================================================================
 //
 //
-// MAGCF - Multi-Agent Generative Character Framework
-//
-// Copyright (c) 2026 Lipon / Psycho Games.
+// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Lipon / Psycho Games.
 //
 // All Rights Reserved.
 //
@@ -27,5 +25,16 @@ enum class EMAGCFGoal : uint8
 {
 	E_NONE,
     E_EAT,
-	E_SLEEP
+    E_DANCE,
+    E_SIT_ON_BENCH,
+    E_TALK_TO_PHONE
+};
+
+UENUM(BlueprintType)
+enum class EMAGCFMood : uint8
+{
+    E_NEUTRAL,
+    E_HAPPY,
+    E_TIRED,
+    E_BORED
 };

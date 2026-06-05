@@ -20,6 +20,8 @@
 #include "MAGCF/AI/MAGCFAIController.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
+#include "MAGCF/Characters/MAGCFCharacter.h"
+#include "Navigation/PathFollowingComponent.h"
 
 AMAGCFAIController::AMAGCFAIController() 
 {
@@ -44,6 +46,35 @@ AMAGCFAIController::AMAGCFAIController()
 void AMAGCFAIController::BeginPlay() 
 {
     Super::BeginPlay();
+}
+
+void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result) 
+{
+    Super::OnMoveCompleted(RequestID, Result);
+
+    auto* ControlledChar = Cast<AMAGCFCharacter>(GetPawn());
+    if (!ControlledChar) return;
+
+    if (Result.IsSuccess())
+    {
+        if (ControlledChar->GetCurrentGoal() == EMAGCFGoal::E_EAT)
+        {
+            ControlledChar->SetIsAtBakery(true);
+        }
+        else if (ControlledChar->GetCurrentGoal() == EMAGCFGoal::E_SIT_ON_BENCH)
+        {
+            ControlledChar->SetIsAtBench(true);
+        }
+
+        ControlledChar->ForceExecuteGoal();
+    }
+    else if (Result.IsFailure())
+    {
+        UE_LOG(LogTemp, Warning, TEXT("AI framework navigation path tracking failed. Resetting goal context."));
+        ControlledChar->SetCurrentGoal(EMAGCFGoal::E_NONE);
+        ControlledChar->SetIsAtBench(false);
+        ControlledChar->SetIsAtBakery(false);
+    }
 }
 
 void AMAGCFAIController::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors) 
