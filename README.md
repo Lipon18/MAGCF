@@ -1,4 +1,4 @@
-__MAGCF — Multi-Agent Generative Character Framework__
+##__MAGCF — Multi-Agent Generative Character Framework__
 
 MAGCF is an experimental AI-powered NPC simulation built in Unreal Engine 5.
 
@@ -8,7 +8,7 @@ The project uses a local Ollama3.2 model running on a Ryzen 5 3600, GTX 1650, an
 
 For the visual, character models and animations come from [Mixamo](https://www.mixamo.com/), which allowed me to spend more time experimenting with AI systems instead of creating art assets.
 
-__What it Does__
+##__What it Does__
 
 Right now, NPCs can perform a small set of actions:
 
@@ -24,7 +24,7 @@ __Challenges__
 
 The biggest challenge has been architecture.
 
-As more NPC states and stats are introduced, keeping track of everything becomes surprisingly difficult. Managing stat decay, decision-making, and action selection across multiple NPCs quickly turns into a design problem rather than just a programming problem.
+As more NPC states and stats are introduced, keeping track of everything becomes surprisingly difficult. Managing state decay, decision-making, and action selection across multiple NPCs quickly turns into a design problem rather than just a programming problem.
 
 At the moment, NPCs sometimes get stuck repeating the same actions, and some behaviors don't work as consistently as I'd like. I think a lot of these issues could be improved with better state tracking, personality systems, and overall AI architecture.
 
