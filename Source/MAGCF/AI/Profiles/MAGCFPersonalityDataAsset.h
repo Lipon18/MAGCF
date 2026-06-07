@@ -23,9 +23,6 @@
 #include "Engine/DataAsset.h"
 #include "MAGCFPersonalityDataAsset.generated.h"
 
-/**
- *
- */
 UCLASS()
 class MAGCF_API UMAGCFPersonalityDataAsset : public UPrimaryDataAsset
 {

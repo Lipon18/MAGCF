@@ -1,14 +1,18 @@
-// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Your Lipon / Psycho Games. All Rights Reserved.
+// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Lipon / Psycho Games. All Rights Reserved.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
-#include "Interfaces/IHttpRequest.h"
-#include "Interfaces/IHttpResponse.h"
+#include "MAGCF/Enums/EGoals.h"
+#include "MAGCF/AI/LLM/MAGCFLLMService.h"
 #include "MAGCFAIComponent.generated.h"
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLLMActionReceived, FString, Action, FString, TargetDetails);
+class UMAGCFLLMService;
+struct FMAGCFCandidateAction;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLLMActionChoiceSignature, EMAGCFGoal, ChosenGoal, const FString&, Reasoning);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLLMActionStringSignature, const FString&, ActionName, const FString&, Reasoning);
 
 UCLASS(ClassGroup = (Custom), meta = (BlueprintSpawnableComponent))
 class MAGCF_API UMAGCFAIComponent : public UActorComponent
@@ -18,27 +22,48 @@ class MAGCF_API UMAGCFAIComponent : public UActorComponent
 public:
     UMAGCFAIComponent();
 
-    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+    FString CompileLLMContextPayload() const;
 
-    UFUNCTION(BlueprintCallable, Category = "MAGCF | AI | LLM")
-    void RequestNextAction();
+    UPROPERTY(BlueprintAssignable, Category = "MAGCF|AI")
+    FOnLLMActionChoiceSignature OnActionSelected;
 
-    UPROPERTY(BlueprintAssignable, Category = "MAGCF | AI | LLM")
-    FOnLLMActionReceived OnLLMActionReceived;
+    UPROPERTY(BlueprintAssignable, Category = "MAGCF|AI")
+    FOnLLMActionStringSignature OnLLMActionReceived;
+
+    UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "MAGCF|AI", meta = (ClampMin = "5.0"))
+    float DecisionInterval = 20.0f;
+
+    FORCEINLINE float GetTimeSinceLastDecision() const { return TimeSinceLastDecision; }
+    FORCEINLINE bool GetIsThinking() const { return bIsThinking; }
 
 protected:
     virtual void BeginPlay() override;
+    virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
-private:
-    float TimeSinceLastDecision = 0.0f;
-    float DecisionInterval = 5.0f;
-    bool bIsThinking = false;
+    void RequestCandidateSelection();
+    void RequestNextAction();
 
-    FString GatherCharacterContext();
-    void SendLLMRequest(const FString& PromptPayload);
-    void OnLLMResponseReceived(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+    FString FormatPayload(const TArray<FMAGCFCandidateAction>& Candidates) const;
+    FString GatherCharacterContext() const;
+
+    void OnLLMSuccess(const FString& CleanResponseText);
+    void OnLLMFailure(const FString& ErrorMessage);
     void ProcessStructuredOutput(const FString& JsonResponseString);
 
-    FString ApiKey = TEXT("GOOGLE_AI_STUDIO_API_KEY");
-    FString GeminiModelEndpoint = TEXT("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
+    FORCEINLINE bool IsActionAllowed(const FString& ActionField) const { return !ActionField.IsEmpty(); }
+
+private:
+    UPROPERTY()
+    UMAGCFLLMService* LLMService = nullptr;
+
+    UPROPERTY(EditAnywhere, Category = "MAGCF|AI")
+    FString InstanceApiKeyOverride;
+
+    FString SystemInstructions;
+    FString LastAction;
+
+    bool bIsThinking = false;
+    float TimeSinceLastDecision = 0.0f;
+    float LLMRetryBlockUntil = 0.0f;
+    float LastActionTimestamp = 0.0f;
 };

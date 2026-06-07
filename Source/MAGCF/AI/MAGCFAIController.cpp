@@ -1,27 +1,11 @@
-// /*===============================================================================
-//
-//
-// MAGCF - Multi-Agent Generative Character Framework
-//
-// Copyright (c) 2026 Your Lipon / Psycho Games.
-//
-// All Rights Reserved.
-//
-// MAGCF is an experimental research framework for autonomous AI-driven characters and multi-agent simulation within Unreal Engine
-// environments.
-//
-// Unauthorized copying, modification, distribution, or use of this software
-//
-// without explicit permission is prohibited.
-//
-//
-// ===============================================================================*/
+// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Lipon / Psycho Games. All Rights Reserved.
 
 #include "MAGCF/AI/MAGCFAIController.h"
 #include "Perception/AIPerceptionComponent.h"
 #include "Perception/AISenseConfig_Sight.h"
 #include "MAGCF/Characters/MAGCFCharacter.h"
 #include "Navigation/PathFollowingComponent.h"
+#include "MAGCF/World/Buildings/MAGCFBakery.h"
 
 AMAGCFAIController::AMAGCFAIController()
 {
@@ -48,11 +32,21 @@ void AMAGCFAIController::BeginPlay()
     Super::BeginPlay();
 }
 
+void AMAGCFAIController::OnPossess(APawn* InPawn) 
+{
+    Super::OnPossess(InPawn);
+
+    if (PerceptionComp)
+    {
+        PerceptionComp->OnPerceptionUpdated.AddUniqueDynamic(this, &AMAGCFAIController::OnPerceptionUpdated);
+    }
+}
+
 void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFollowingResult& Result)
 {
     Super::OnMoveCompleted(RequestID, Result);
 
-    auto* ControlledChar = Cast<AMAGCFCharacter>(GetPawn());
+    auto* const ControlledChar = Cast<AMAGCFCharacter>(GetPawn());
     if (!ControlledChar) return;
 
     if (Result.IsSuccess())
@@ -60,9 +54,8 @@ void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFoll
         if (ControlledChar->GetCurrentGoal() == EMAGCFGoal::E_EAT)
         {
             ControlledChar->SetIsAtBakery(true);
+            ControlledChar->ExecuteGoal();
         }
-
-        ControlledChar->ForceExecuteGoal();
     }
     else if (Result.IsFailure())
     {
@@ -74,11 +67,12 @@ void AMAGCFAIController::OnMoveCompleted(FAIRequestID RequestID, const FPathFoll
 
 void AMAGCFAIController::OnPerceptionUpdated(const TArray<AActor*>& UpdatedActors)
 {
-    for (auto* Actor : UpdatedActors)
+    for (const auto* const Actor : UpdatedActors)
     {
-        if (Actor)
+        if (Actor && Actor->IsA<AMAGCFBakery>())
         {
-            // cache the bakery when it is seen
+            CachedBakeryTarget = Cast<AMAGCFBakery>(const_cast<AActor*>(Actor));
+            break;
         }
     }
 }

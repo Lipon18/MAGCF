@@ -1,23 +1,7 @@
-// /*===============================================================================
-//
-//
-// MAGCF - Multi-Agent Generative Character Framework
-//
-// Copyright (c) 2026 Your Lipon / Psycho Games.
-//
-// All Rights Reserved.
-//
-// MAGCF is an experimental research framework for autonomous AI-driven characters and multi-agent simulation within Unreal Engine
-// environments.
-//
-// Unauthorized copying, modification, distribution, or use of this software
-//
-// without explicit permission is prohibited.
-//
-//
-// ===============================================================================*/
+// MAGCF - Multi-Agent Generative Character Framework Copyright (c) 2026 Lipon / Psycho Games. All Rights Reserved.
 
 #include "MAGCF/MAGCFComponents/MAGCFNeedComponent.h"
+#include "MAGCF/AI/Profiles/MAGCFPersonalityDataAsset.h"
 
 UMAGCFNeedComponent::UMAGCFNeedComponent()
 {
@@ -32,23 +16,23 @@ void UMAGCFNeedComponent::BeginPlay()
     HungerNeed.NeedName = TEXT("Hunger");
     HungerNeed.CurrentValue = 20.0f;
     HungerNeed.MaxValue = 100.0f;
-    HungerNeed.DrainRate = 2.0f;
+    HungerNeed.DrainRate = 0.08f;
     HungerNeed.CriticalThreshold = 80.0f;
     TrackedNeeds.Add(TEXT("Hunger"), HungerNeed);
 
     FNPCNeedState EnergyNeed;
     EnergyNeed.NeedName = TEXT("Energy");
-    EnergyNeed.CurrentValue = 10.0f;
+    EnergyNeed.CurrentValue = 85.0f;
     EnergyNeed.MaxValue = 100.0f;
-    EnergyNeed.DrainRate = 1.0f;
-    EnergyNeed.CriticalThreshold = 75.0f;
+    EnergyNeed.DrainRate = 0.05f;
+    EnergyNeed.CriticalThreshold = 75.0f;   
     TrackedNeeds.Add(TEXT("Energy"), EnergyNeed);
 
     FNPCNeedState FunNeed;
     FunNeed.NeedName = TEXT("Fun");
     FunNeed.CurrentValue = 30.0f;
     FunNeed.MaxValue = 100.0f;
-    FunNeed.DrainRate = 2.5f;
+    FunNeed.DrainRate = 0.12f;
     FunNeed.CriticalThreshold = 70.0f;
     TrackedNeeds.Add(TEXT("Fun"), FunNeed);
 }
@@ -59,9 +43,28 @@ void UMAGCFNeedComponent::TickComponent(float DeltaTime, ELevelTick TickType, FA
 
     for (auto& Element : TrackedNeeds)
     {
-        FNPCNeedState& Need = Element.Value;
-        Need.CurrentValue += DeltaTime * Need.DrainRate;
+        auto& Need = Element.Value;
+        const float DirectionMultiplier = IsInverseNeed(Need.NeedName) ? -1.0f : 1.0f;
+        Need.CurrentValue += (DeltaTime * Need.DrainRate * DirectionMultiplier);
         Need.CurrentValue = FMath::Clamp(Need.CurrentValue, 0.0f, Need.MaxValue);
+    }
+}
+
+void UMAGCFNeedComponent::InitializeNeedsFromPersonality(const UMAGCFPersonalityDataAsset* Personality)
+{
+    if (!Personality) return;
+
+    if (auto* const Hunger = TrackedNeeds.Find(TEXT("Hunger")))
+    {
+        Hunger->DrainRate *= (1.35f - (Personality->Fortitude * 0.35f));
+    }
+    if (auto* const Energy = TrackedNeeds.Find(TEXT("Energy")))
+    {
+        Energy->DrainRate *= (1.25f - (Personality->Stability * 0.25f));
+    }
+    if (auto* const Fun = TrackedNeeds.Find(TEXT("Fun")))
+    {
+        Fun->DrainRate *= (0.5f + (Personality->SocialTendency * 1.0f));
     }
 }
 
@@ -70,23 +73,36 @@ FNPCNeedState* UMAGCFNeedComponent::GetNeed(FName NeedName)
     return TrackedNeeds.Find(NeedName);
 }
 
-void UMAGCFNeedComponent::SatisfyNeed(FName NeedName, float Amount) 
+const FNPCNeedState* UMAGCFNeedComponent::GetNeed(FName NeedName) const
 {
-    if (FNPCNeedState* Need = GetNeed(NeedName))
+    return TrackedNeeds.Find(NeedName);
+}
+
+void UMAGCFNeedComponent::SatisfyNeed(FName NeedName, float Amount)
+{
+    if (auto* const Need = GetNeed(NeedName))
     {
         Need->CurrentValue = FMath::Clamp(Need->CurrentValue - Amount, 0.0f, Need->MaxValue);
     }
 }
 
+void UMAGCFNeedComponent::RestoreNeed(FName NeedName, float Amount)
+{
+    if (auto* const Need = GetNeed(NeedName))
+    {
+        Need->CurrentValue = FMath::Clamp(Need->CurrentValue + Amount, 0.0f, Need->MaxValue);
+    }
+}
+
 bool UMAGCFNeedComponent::CheckIfAnyNeedIsCritical(FName& OutCriticalNeedName)
 {
-    TArray<FName> PriorityChecklist = {TEXT("Hungry"), TEXT("Energy"), TEXT("Fun")};
+    static const TArray<FName> PriorityChecklist = {TEXT("Hunger"), TEXT("Energy"), TEXT("Fun")};
 
-    for (const FName& NeedName : PriorityChecklist)
+    for (const auto& NeedName : PriorityChecklist)
     {
-        if (auto* Need = TrackedNeeds.Find(NeedName))
+        if (const auto* const Need = TrackedNeeds.Find(NeedName))
         {
-            if (Need->CurrentValue >= Need->CriticalThreshold)
+            if (IsNeedCritical(NeedName, *Need))
             {
                 OutCriticalNeedName = NeedName;
                 return true;
