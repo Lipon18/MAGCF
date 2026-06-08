@@ -4,7 +4,7 @@ MAGCF is an experimental AI-powered NPC simulation built in Unreal Engine 5.
 
 This started as a personal challenge to see how far I could push AI-driven NPC behavior inside a game environment. It's also my first AI project, so a lot of it has been learning by building, making mistakes, and figuring things out along the way.
 
-The project uses a local Ollama3.2 model running on a Ryzen 5 3600, GTX 1650, and 16GB of RAM. There is no backend server or external AI infrastructure; everything runs directly through Unreal Engine. My focus was to keep the project simple and understand how LLMs could be used to drive NPC decision-making in a real-time simulation.
+The project uses a local Ollama3.2 model running on a 4GB VRAM. There is no backend server or external AI infrastructure; everything runs directly through Unreal Engine. My focus was to keep the project simple and understand how LLMs could be used to drive NPC decision-making in a real-time simulation.
 
 For the visual, character models and animations come from [Mixamo](https://www.mixamo.com/), which allowed me to spend more time experimenting with AI systems instead of creating art assets.
 
