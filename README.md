@@ -8,6 +8,8 @@ The project uses a local Ollama3.2 model running on a Ryzen 5 3600, GTX 1650, an
 
 For the visual, character models and animations come from [Mixamo](https://www.mixamo.com/), which allowed me to spend more time experimenting with AI systems instead of creating art assets.
 
+Demo [Video](https://youtu.be/AYjYaZ6B1r8).
+
 ## __What it Does__
 
 Right now, NPCs can perform a small set of actions:
